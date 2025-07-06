@@ -22,6 +22,12 @@ const TableOrder = ({ tableId }) => {
 
   const addToCart = (item) => setCart([...cart, item]);
 
+  const removeFromCart = (index) => {
+    const newCart = [...cart];
+    newCart.splice(index, 1);
+    setCart(newCart);
+  };
+
   const placeOrder = async () => {
     if (!location) {
       alert("Location required!");
@@ -69,6 +75,13 @@ const TableOrder = ({ tableId }) => {
           {cart.map((item, idx) => (
             <li key={idx} style={styles.cartItem}>
               {item.name} - Rs {item.price}
+              <button
+                onClick={() => removeFromCart(idx)}
+                style={styles.removeButton}
+                aria-label={`Remove ${item.name} from cart`}
+              >
+                ❌
+              </button>
             </li>
           ))}
         </ul>
@@ -148,6 +161,20 @@ const styles = {
     fontSize: 16,
     padding: "8px 10px",
     borderBottom: "1px solid #e5e7eb",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  removeButton: {
+    marginLeft: 12,
+    backgroundColor: "#ef4444",
+    color: "white",
+    border: "none",
+    borderRadius: 6,
+    padding: "4px 10px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: 14,
   },
   placeOrderBtn: {
     width: "100%",
