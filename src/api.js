@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Create an Axios instance
 const api = axios.create({
-  baseURL: "https://smartorderbackend-production.up.railway.app/", // ✅ Change this to your live server URL when deploying
+  baseURL: "https://smartorderbackend-production.up.railway.app/api/", // ✅ Change this to your live server URL when deploying
 });
 
 // Automatically attach token to every request
