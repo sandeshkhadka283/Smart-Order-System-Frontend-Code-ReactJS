@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import TableOrder from "./pages/TableOrder";
 import StaffDashboard from "./pages/StaffDashboard";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function App() {
   const [isStaff, setIsStaff] = useState(false);
@@ -54,6 +56,8 @@ function App() {
       <main style={styles.main}>
         {isStaff ? <StaffDashboard /> : <TableOrder tableId={tableId} />}
       </main>
+            <ToastContainer position="top-right" autoClose={1500} />
+
     </div>
   );
 }
