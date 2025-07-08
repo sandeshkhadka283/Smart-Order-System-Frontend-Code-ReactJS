@@ -243,9 +243,15 @@ const StaffDashboard = () => {
         pendingOrders.map((order) => (
           <div key={order._id} style={styles.orderCard}>
             <p><strong>Table:</strong> {order.tableId}</p>
-            <p><strong>Items:</strong> {order.items.map((i) => i.name).join(", ")}</p>
+            <p><strong>Items:</strong></p>
+            <ul style={{ marginLeft: 20 }}>
+              {order.items.map((item, idx) => (
+                <li key={idx}>{item.name}</li>
+              ))}
+            </ul>
             <p><strong>IP:</strong> {order.ip || "N/A"}</p>
             <p><strong>Location:</strong> {order.location ? `${order.location.lat}, ${order.location.lng}` : "N/A"}</p>
+            {order.createdAt && <p><small>Ordered at: {new Date(order.createdAt).toLocaleString()}</small></p>}
             <div style={styles.actionButtons}>
               <button onClick={() => confirmOrder(order._id)} style={styles.confirmBtn}>✅ Confirm</button>
               <button onClick={() => deleteOrder(order._id)} style={styles.deleteBtn}>🗑️ Delete</button>
@@ -261,12 +267,16 @@ const StaffDashboard = () => {
         confirmedOrders.map((order) => (
           <div key={order._id} style={{ ...styles.orderCard, ...styles.confirmedOrderCard }}>
             <p><strong>Table:</strong> {order.tableId}</p>
-            <p><strong>Items:</strong> {order.items.map((i) => i.name).join(", ")}</p>
+            <p><strong>Items:</strong></p>
+            <ul style={{ marginLeft: 20 }}>
+              {order.items.map((item, idx) => (
+                <li key={idx}>{item.name}</li>
+              ))}
+            </ul>
             <p><strong>IP:</strong> {order.ip || "N/A"}</p>
             <p><strong>Location:</strong> {order.location ? `${order.location.lat}, ${order.location.lng}` : "N/A"}</p>
-            <button onClick={() => deleteOrder(order._id)} style={styles.deleteBtn}>
-              🗑️ Delete
-            </button>
+            {order.createdAt && <p><small>Ordered at: {new Date(order.createdAt).toLocaleString()}</small></p>}
+            <button onClick={() => deleteOrder(order._id)} style={styles.deleteBtn}>🗑️ Delete</button>
           </div>
         ))
       )}
