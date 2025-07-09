@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../api";
+import Swal from 'sweetalert2';
+
 
 const menuData = {
   Breakfast: [
@@ -50,20 +52,27 @@ const TableOrder = ({ tableId }) => {
   const [location, setLocation] = useState(null);
   const [expandedCategories, setExpandedCategories] = useState({});
 
-  useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => alert("Location access is required to place an order")
-    );
+useEffect(() => {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    () => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Location Required',
+        text: 'Location access is required to place an order!',
+      });
+    }
+  );
 
-    setMenu(menuData);
+  setMenu(menuData);
 
-    const initExpand = {};
-    Object.keys(menuData).forEach((cat) => {
-      initExpand[cat] = true;
-    });
-    setExpandedCategories(initExpand);
-  }, []);
+  const initExpand = {};
+  Object.keys(menuData).forEach((cat) => {
+    initExpand[cat] = true;
+  });
+  setExpandedCategories(initExpand);
+}, []);
+
 
   const addToCart = (item) => {
     setCart((prevCart) => {
@@ -104,28 +113,85 @@ const TableOrder = ({ tableId }) => {
     }));
   };
 
-  const placeOrder = async () => {
-    if (!location) {
-      alert("Location required!");
-      return;
-    }
-    if (Object.keys(cart).length === 0) {
-      alert("Cart is empty!");
-      return;
-    }
+ const placeOrder = async () => {
+  if (!location) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Location Missing',
+      text: 'Please enable location to place an order!',
+    });
+    return;
+  }
+
+  if (Object.keys(cart).length === 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Empty Cart',
+      text: 'Your cart is empty!',
+    });
+    return;
+  }
+
+  const items = Object.entries(cart).map(([name, { price, qty }]) => ({
+    name,
+    price,
+    quantity: qty,
+    subtotal: price * qty,
+  }));
+
+  const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+  const orderDetailsHtml = `
+    <div style="text-align:left;">
+      <ul style="list-style:none; padding:0; margin:0;">
+        ${items
+          .map(
+            (item) =>
+              `<li style="margin-bottom:6px;">
+                <strong>${item.name}</strong> × ${item.quantity} = Rs ${item.subtotal}
+              </li>`
+          )
+          .join("")}
+      </ul>
+      <hr />
+      <strong>Total: Rs ${total}</strong>
+    </div>
+  `;
+
+  const result = await Swal.fire({
+    title: 'Confirm Your Order',
+    html: orderDetailsHtml,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#059669',
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Yes, place order!',
+    width: 500,
+  });
+
+  if (result.isConfirmed) {
     try {
-      const items = Object.entries(cart).map(([name, { price, qty }]) => ({
-        name,
-        price,
-        quantity: qty,
-      }));
       await api.post("/orders", { tableId, items, location });
-      alert("Order placed successfully!");
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Order Placed!',
+        text: 'Your order has been placed successfully.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
       setCart({});
-    } catch {
-      alert("Failed to place order.");
+    } catch (error) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Order Failed',
+        text: 'Something went wrong while placing your order.',
+      });
     }
-  };
+  }
+};
+
 
   const totalPrice = Object.values(cart).reduce((sum, item) => sum + item.price * item.qty, 0);
 

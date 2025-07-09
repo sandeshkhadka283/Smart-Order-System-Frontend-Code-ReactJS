@@ -1,20 +1,15 @@
 import React, { useState, useEffect } from "react";
 import api from "../api";
+import Swal from "sweetalert2";
 
 const StaffDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
-
-  // Login state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState(null);
-
-  // Orders state
   const [pendingOrders, setPendingOrders] = useState([]);
   const [confirmedOrders, setConfirmedOrders] = useState([]);
-
-  // Register form state - including new username
   const [regUsername, setRegUsername] = useState("");
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
@@ -112,18 +107,52 @@ const StaffDashboard = () => {
       await api.post(`/orders/confirm/${id}`, {}, config);
       fetchPendingOrders();
       fetchConfirmedOrders();
+      Swal.fire({
+        icon: "success",
+        title: "Order Confirmed",
+        text: "The order has been confirmed.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (err) {
-      console.error("Failed to confirm order", err);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to confirm order!",
+      });
     }
   };
 
   const deleteOrder = async (id) => {
-    try {
-      await api.delete(`/orders/${id}`, config);
-      fetchPendingOrders();
-      fetchConfirmedOrders();
-    } catch (err) {
-      console.error("Failed to delete order", err);
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/orders/${id}`, config);
+        fetchPendingOrders();
+        fetchConfirmedOrders();
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: "The order has been deleted.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } catch (err) {
+        Swal.fire({
+          icon: "error",
+          title: "Oops...",
+          text: "Failed to delete the order!",
+        });
+      }
     }
   };
 
@@ -243,7 +272,6 @@ const StaffDashboard = () => {
         pendingOrders.map((order) => (
           <div key={order._id} style={styles.orderCard}>
             <p><strong>Table:</strong> {order.tableId}</p>
-            <p><strong>Items:</strong></p>
             <ul style={{ marginLeft: 20 }}>
               {order.items.map((item, idx) => (
                 <li key={idx}>{item.name}</li>
@@ -267,7 +295,6 @@ const StaffDashboard = () => {
         confirmedOrders.map((order) => (
           <div key={order._id} style={{ ...styles.orderCard, ...styles.confirmedOrderCard }}>
             <p><strong>Table:</strong> {order.tableId}</p>
-            <p><strong>Items:</strong></p>
             <ul style={{ marginLeft: 20 }}>
               {order.items.map((item, idx) => (
                 <li key={idx}>{item.name}</li>
