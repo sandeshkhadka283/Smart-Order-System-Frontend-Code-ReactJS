@@ -2,7 +2,21 @@ import React, { useState, useEffect } from "react";
 import api from "../api";
 import Swal from "sweetalert2";
 
+
+
+
 const StaffDashboard = () => {
+
+  const orderStatuses = [
+  "pending",
+  "confirmed",
+  "received",
+  "preparing",
+  "ready",
+  "serving",
+  "completed",
+  "cancelled",
+];
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -16,6 +30,17 @@ const StaffDashboard = () => {
   const [regPassword, setRegPassword] = useState("");
   const [regRole, setRegRole] = useState("staff");
   const [regStatus, setRegStatus] = useState(null);
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+  const [selectedConfirmedOrderIds, setSelectedConfirmedOrderIds] = useState([]);
+  const [pendingLocations, setPendingLocations] = useState({});
+const [confirmedLocations, setConfirmedLocations] = useState({});
+
+const [otherOrdersByStatus, setOtherOrdersByStatus] = useState({});
+const [otherLocationsByStatus, setOtherLocationsByStatus] = useState({});
+
+
+
+
 
   const config = {
     headers: {
@@ -84,23 +109,91 @@ const StaffDashboard = () => {
     }
   };
 
-  const fetchPendingOrders = async () => {
-    try {
-      const res = await api.get("/orders/pending", config);
-      setPendingOrders(res.data);
-    } catch (err) {
-      console.error("Failed to fetch pending orders", err);
-    }
-  };
+ const fetchPendingOrders = async () => {
+  try {
+    const res = await api.get("/orders/pending", config);
+    setPendingOrders(res.data);
+
+    // Fetch location names for each order
+    const locs = {};
+    await Promise.all(
+      res.data.map(async (order) => {
+        if (order.location?.lat && order.location?.lng) {
+          locs[order._id] = await fetchLocationName(order.location.lat, order.location.lng);
+        } else {
+          locs[order._id] = "N/A";
+        }
+      })
+    );
+    setPendingLocations(locs);
+  } catch (err) {
+    console.error("Failed to fetch pending orders", err);
+  }
+};
 
   const fetchConfirmedOrders = async () => {
-    try {
-      const res = await api.get("/orders/confirmed", config);
-      setConfirmedOrders(res.data);
-    } catch (err) {
-      console.error("Failed to fetch confirmed orders", err);
-    }
-  };
+  try {
+    const res = await api.get("/orders/confirmed", config);
+    setConfirmedOrders(res.data);
+
+    const locs = {};
+    await Promise.all(
+      res.data.map(async (order) => {
+        if (order.location?.lat && order.location?.lng) {
+          locs[order._id] = await fetchLocationName(order.location.lat, order.location.lng);
+        } else {
+          locs[order._id] = "N/A";
+        }
+      })
+    );
+    setConfirmedLocations(locs);
+  } catch (err) {
+    console.error("Failed to fetch confirmed orders", err);
+  }
+};
+
+const fetchOtherOrders = async () => {
+  const otherStatuses = [
+    "received",
+    "preparing",
+    "ready",
+    "serving",
+    "completed",
+    "cancelled"
+  ];
+  const all = {};
+  const locations = {};
+
+  await Promise.all(
+    otherStatuses.map(async (status) => {
+      try {
+        const res = await api.get(`/orders/status/${status}`, config);
+        all[status] = res.data;
+
+        const locs = {};
+        await Promise.all(
+          res.data.map(async (order) => {
+            if (order.location?.lat && order.location?.lng) {
+              locs[order._id] = await fetchLocationName(order.location.lat, order.location.lng);
+            } else {
+              locs[order._id] = "N/A";
+            }
+          })
+        );
+        locations[status] = locs;
+      } catch (err) {
+        all[status] = [];
+        locations[status] = {};
+      }
+    })
+  );
+
+  console.log("Other Orders fetched:", all);
+  setOtherOrdersByStatus(all);
+  setOtherLocationsByStatus(locations);
+};
+
+
 
   const confirmOrder = async (id) => {
     try {
@@ -155,15 +248,166 @@ const StaffDashboard = () => {
       }
     }
   };
+  const toggleSelectOrder = (id) => {
+  setSelectedOrderIds((prev) =>
+    prev.includes(id) ? prev.filter((oid) => oid !== id) : [...prev, id]
+  );
+};
+
+const toggleSelectAllOrders = () => {
+  if (selectedOrderIds.length === pendingOrders.length) {
+    setSelectedOrderIds([]);
+  } else {
+    setSelectedOrderIds(pendingOrders.map((order) => order._id));
+  }
+};
+
+const deleteSelectedOrders = async () => {
+  const result = await Swal.fire({
+    title: "Delete selected orders?",
+    text: `You are about to delete ${selectedOrderIds.length} orders.`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#6b7280",
+    confirmButtonText: "Yes, delete all!",
+  });
+
+  if (result.isConfirmed) {
+    try {
+      await Promise.all(
+        selectedOrderIds.map((id) => api.delete(`/orders/${id}`, config))
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: `${selectedOrderIds.length} orders deleted.`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      setSelectedOrderIds([]);
+      fetchPendingOrders();
+      fetchConfirmedOrders();
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete selected orders.",
+      });
+    }
+  }
+};
+const toggleSelectAllConfirmedOrders = () => {
+  if (selectedConfirmedOrderIds.length === confirmedOrders.length) {
+    setSelectedConfirmedOrderIds([]);
+  } else {
+    setSelectedConfirmedOrderIds(confirmedOrders.map((o) => o._id));
+  }
+};
+
+const deleteSelectedConfirmedOrders = async () => {
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: `Delete ${selectedConfirmedOrderIds.length} confirmed order(s)?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#6b7280",
+    confirmButtonText: "Yes, delete them!",
+  });
+
+  if (result.isConfirmed) {
+    try {
+      for (const id of selectedConfirmedOrderIds) {
+        await api.delete(`/orders/${id}`, config);
+      }
+      fetchConfirmedOrders();
+      setSelectedConfirmedOrderIds([]);
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: "Selected confirmed orders have been deleted.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete selected confirmed orders.",
+      });
+    }
+  }
+};
+
+const fetchLocationName = async (lat, lng) => {
+  console.log("📍 fetchLocationName called with:", lat, lng);
+  
+  if (!lat || !lng) return "Unknown location";
+
+  const apiKey = process.env.REACT_APP_OPENCAGE_API_KEY;
+  console.log("🔑 OpenCage API Key:", apiKey);
+  if (!apiKey) {
+    console.error("❌ API Key is missing!");
+    return "Unknown location";
+  }
+
+  try {
+    const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat},${lng}&key=${apiKey}&no_annotations=1`;
+    console.log("🌍 Fetching location data from URL:", url);
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    console.log("📡 API response:", data);
+
+    if (data.results && data.results.length > 0) {
+      return data.results[0].formatted;
+    } else {
+      return "Unknown location";
+    }
+  } catch (error) {
+    console.error("❌ Error fetching location:", error);
+    return "Unknown location";
+  }
+};
+const updateOrderStatus = async (orderId, newStatus) => {
+  try {
+    await api.patch(`/orders/${orderId}/status`, { status: newStatus }, config);
+    Swal.fire({
+      icon: "success",
+      title: "Status Updated",
+      text: `Order status updated to "${newStatus}".`,
+      timer: 1500,
+      showConfirmButton: false,
+    });
+    fetchPendingOrders();
+    fetchConfirmedOrders();
+    fetchOtherOrders();
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "Update Failed",
+      text: err.response?.data?.message || "Failed to update status.",
+    });
+  }
+};
+
+
+
 
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchPendingOrders();
     fetchConfirmedOrders();
+      fetchOtherOrders(); // 👈 added here
+
     const interval = setInterval(() => {
       fetchPendingOrders();
       fetchConfirmedOrders();
-    }, 10000);
+          fetchOtherOrders(); // 👈 added here
+
+    }, 24000000);
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
@@ -266,193 +510,369 @@ const StaffDashboard = () => {
       </button>
 
       <h2 style={styles.sectionTitle}>📋 Pending Orders</h2>
+      {/* ✅ Select All + Delete Selected Controls */}
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+  <div>
+    <input
+      type="checkbox"
+      onChange={toggleSelectAllOrders}
+      checked={selectedOrderIds.length === pendingOrders.length && pendingOrders.length > 0}
+    /> Select All
+  </div>
+  <button
+    onClick={deleteSelectedOrders}
+    style={{ ...styles.deleteBtn, padding: "6px 12px", backgroundColor: "#dc2626", color: "#fff" }}
+    disabled={selectedOrderIds.length === 0}
+  >
+    🗑️ Delete Selected ({selectedOrderIds.length})
+  </button>
+</div>
+
       {pendingOrders.length === 0 ? (
-        <p style={styles.emptyText}>No pending orders.</p>
-      ) : (
-        pendingOrders.map((order) => (
-          <div key={order._id} style={styles.orderCard}>
-            <p><strong>Table:</strong> {order.tableId}</p>
-            <ul style={{ marginLeft: 20 }}>
-              {order.items.map((item, idx) => (
-                <li key={idx}>{item.name}</li>
-              ))}
-            </ul>
-            <p><strong>IP:</strong> {order.ip || "N/A"}</p>
-            <p><strong>Location:</strong> {order.location ? `${order.location.lat}, ${order.location.lng}` : "N/A"}</p>
-            {order.createdAt && <p><small>Ordered at: {new Date(order.createdAt).toLocaleString()}</small></p>}
-            <div style={styles.actionButtons}>
-              <button onClick={() => confirmOrder(order._id)} style={styles.confirmBtn}>✅ Confirm</button>
-              <button onClick={() => deleteOrder(order._id)} style={styles.deleteBtn}>🗑️ Delete</button>
-            </div>
-          </div>
-        ))
+  <p style={styles.emptyText}>No pending orders.</p>
+) : (
+  pendingOrders.map((order) => (
+    <div key={order._id} style={styles.orderCard}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <input
+          type="checkbox"
+          checked={selectedOrderIds.includes(order._id)}
+          onChange={() => toggleSelectOrder(order._id)}
+          style={{ marginRight: 10 }}
+        />
+        <p><strong>Table:</strong> {order.tableId}</p>
+      </div>
+      <ul style={{ marginLeft: 20 }}>
+        {order.items.map((item, idx) => (
+          <li key={idx}>{item.name}</li>
+        ))}
+      </ul>
+      <p><strong>IP:</strong> {order.ip || "N/A"}</p>
+      <p><strong>Location:</strong> {pendingLocations[order._id] || "N/A"}</p>
+      {order.createdAt && (
+        <p><small>Ordered at: {new Date(order.createdAt).toLocaleString()}</small></p>
       )}
+      <p>
+        <strong>Status:</strong>{" "}
+        <select
+          value={order.status}
+          onChange={(e) => updateOrderStatus(order._id, e.target.value)}
+          style={{ padding: "4px 8px", borderRadius: 6 }}
+        >
+          {orderStatuses.map((status) => (
+            <option key={status} value={status}>
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </option>
+          ))}
+        </select>
+      </p>
+      <div style={styles.actionButtons}>
+        <button onClick={() => confirmOrder(order._id)} style={styles.confirmBtn}>✅ Confirm</button>
+        <button onClick={() => deleteOrder(order._id)} style={styles.deleteBtn}>🗑️ Delete</button>
+      </div>
+    </div>
+  ))
+)}
 
       <h2 style={styles.sectionTitle}>✅ Confirmed Orders</h2>
+      {/* ✅ Select All + Delete Selected Controls for Confirmed */}
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+  <div>
+    <input
+      type="checkbox"
+      onChange={toggleSelectAllConfirmedOrders}
+      checked={selectedConfirmedOrderIds.length === confirmedOrders.length && confirmedOrders.length > 0}
+    /> Select All
+  </div>
+  <button
+    onClick={deleteSelectedConfirmedOrders}
+    style={{ ...styles.deleteBtn, padding: "6px 12px", backgroundColor: "#dc2626", color: "#fff" }}
+    disabled={selectedConfirmedOrderIds.length === 0}
+  >
+    🗑️ Delete Selected ({selectedConfirmedOrderIds.length})
+  </button>
+</div>
+
       {confirmedOrders.length === 0 ? (
         <p style={styles.emptyText}>No confirmed orders.</p>
       ) : (
         confirmedOrders.map((order) => (
-          <div key={order._id} style={{ ...styles.orderCard, ...styles.confirmedOrderCard }}>
-            <p><strong>Table:</strong> {order.tableId}</p>
+         <div key={order._id} style={{ ...styles.orderCard, ...styles.confirmedOrderCard }}>
+  <input
+    type="checkbox"
+    checked={selectedConfirmedOrderIds.includes(order._id)}
+    onChange={() => {
+      setSelectedConfirmedOrderIds((prev) =>
+        prev.includes(order._id)
+          ? prev.filter((id) => id !== order._id)
+          : [...prev, order._id]
+      );
+    }}
+    style={{ marginRight: 8 }}
+  />
+  <p><strong>Table:</strong> {order.tableId}</p>
             <ul style={{ marginLeft: 20 }}>
               {order.items.map((item, idx) => (
                 <li key={idx}>{item.name}</li>
               ))}
             </ul>
             <p><strong>IP:</strong> {order.ip || "N/A"}</p>
-            <p><strong>Location:</strong> {order.location ? `${order.location.lat}, ${order.location.lng}` : "N/A"}</p>
+<p>
+  <strong>Location:</strong>{" "}
+  {confirmedLocations[order._id] || "N/A"}
+</p>
+
             {order.createdAt && <p><small>Ordered at: {new Date(order.createdAt).toLocaleString()}</small></p>}
             <button onClick={() => deleteOrder(order._id)} style={styles.deleteBtn}>🗑️ Delete</button>
           </div>
         ))
       )}
+
+    {["received", "preparing", "ready", "serving", "completed", "cancelled"].map((status) => (
+  <div key={status}>
+    <h2 style={styles.sectionTitle}>
+      {status === "received" && "📥 Received Orders"}
+      {status === "preparing" && "🍳 Preparing Orders"}
+      {status === "ready" && "🛎️ Ready Orders"}
+      {status === "serving" && "🍽️ Serving Orders"}
+      {status === "completed" && "🏁 Completed Orders"}
+      {status === "cancelled" && "❌ Cancelled Orders"}
+    </h2>
+
+    {(otherOrdersByStatus[status] || []).length === 0 ? (
+      <p style={styles.emptyText}>No {status} orders.</p>
+    ) : (
+      (otherOrdersByStatus[status] || []).map((order) => (
+        <div key={order._id} style={styles.orderCard}>
+          <p><strong>Table:</strong> {order.tableId}</p>
+          <ul>
+            {order.items.map((item, idx) => (
+              <li key={idx}>{item.name} × {item.quantity}</li>
+            ))}
+          </ul>
+          <p><strong>IP:</strong> {order.ip || "N/A"}</p>
+          <p>
+            <strong>Location:</strong>{" "}
+            {otherLocationsByStatus[status]?.[order._id] || "N/A"}
+          </p>
+          {order.createdAt && (
+            <p><small>Ordered at: {new Date(order.createdAt).toLocaleString()}</small></p>
+          )}
+          <p>
+            <strong>Status:</strong>{" "}
+            <select
+              value={order.status}
+              onChange={(e) => updateOrderStatus(order._id, e.target.value)}
+              style={{ padding: "4px 8px", borderRadius: 6 }}
+            >
+              {orderStatuses.map((s) => (
+                <option key={s} value={s}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </option>
+              ))}
+            </select>
+          </p>
+          <div style={styles.actionButtons}>
+            <button onClick={() => deleteOrder(order._id)} style={styles.deleteBtn}>🗑️ Delete</button>
+          </div>
+        </div>
+      ))
+    )}
+  </div>
+))}
+
     </div>
   );
 };
 
 const styles = {
   loginContainer: {
-    maxWidth: 400,
-    margin: "auto",
-    padding: 30,
-    backgroundColor: "#ffffff",
+    maxWidth: 420,
+    margin: "3rem auto",
+    padding: 32,
+    backgroundColor: "#fff",
     borderRadius: 16,
-    boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
+    boxShadow: "0 16px 48px rgba(0,0,0,0.1)",
     display: "flex",
     flexDirection: "column",
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
   },
   title: {
-    fontWeight: 700,
-    fontSize: 24,
-    marginBottom: 24,
+    fontWeight: 800,
+    fontSize: 28,
+    marginBottom: 28,
     textAlign: "center",
-    color: "#111827",
+    color: "#1f2937",
+    letterSpacing: "1.5px",
   },
   input: {
-    marginBottom: 14,
-    padding: "12px 14px",
-    fontSize: 15,
-    borderRadius: 8,
-    border: "1.5px solid #d1d5db",
+    marginBottom: 18,
+    padding: "14px 18px",
+    fontSize: 16,
+    borderRadius: 12,
+    border: "1.8px solid #d1d5db",
     outline: "none",
-    transition: "border-color 0.3s",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
     width: "100%",
+    boxSizing: "border-box",
+    fontWeight: 500,
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+  },
+  inputFocus: {
+    borderColor: "#3b82f6",
+    boxShadow: "0 0 6px #3b82f6",
   },
   loginButton: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#2563eb", // Slightly deeper blue
     color: "white",
-    padding: "12px",
-    borderRadius: 10,
+    padding: "14px",
+    borderRadius: 14,
     fontWeight: 700,
     border: "none",
     cursor: "pointer",
-    marginTop: 6,
-    boxShadow: "0 6px 16px rgba(59,130,246,0.5)",
+    marginTop: 12,
+    boxShadow: "0 8px 20px rgba(37, 99, 235, 0.5)",
+    fontSize: 16,
+    letterSpacing: "0.7px",
+    transition: "background-color 0.3s ease",
+  },
+  loginButtonHover: {
+    backgroundColor: "#1e40af",
   },
   errorText: {
     color: "#dc2626",
-    marginTop: 10,
-    fontWeight: "600",
+    marginTop: 14,
+    fontWeight: "700",
     textAlign: "center",
+    fontSize: 14,
   },
   toggleRegisterBtn: {
-    marginTop: 24,
-    padding: "10px 0",
-    borderRadius: 10,
+    marginTop: 28,
+    padding: "14px 0",
+    borderRadius: 14,
     border: "none",
     color: "white",
     fontWeight: "700",
     cursor: "pointer",
     width: "100%",
-    boxShadow: "0 6px 16px rgba(16,185,129,0.6)",
-    transition: "background-color 0.3s",
+    boxShadow: "0 8px 24px rgba(16,185,129,0.7)",
+    fontSize: 16,
+    letterSpacing: "0.7px",
+    transition: "background-color 0.3s ease",
   },
   registerForm: {
-    marginTop: 20,
+    marginTop: 24,
     display: "flex",
     flexDirection: "column",
     backgroundColor: "#f9fafb",
-    padding: 20,
-    borderRadius: 14,
-    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+    padding: 28,
+    borderRadius: 16,
+    boxShadow: "0 10px 26px rgba(0,0,0,0.07)",
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
   },
   registerButton: {
-    marginTop: 10,
-    padding: "12px",
-    backgroundColor: "#10b981",
+    marginTop: 14,
+    padding: "14px",
+    backgroundColor: "#059669",
     color: "white",
-    borderRadius: 10,
+    borderRadius: 14,
     fontWeight: 700,
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 6px 16px rgba(16,185,129,0.6)",
+    boxShadow: "0 8px 24px rgba(5, 150, 105, 0.7)",
+    fontSize: 16,
+    letterSpacing: "0.7px",
   },
   dashboardContainer: {
-    maxWidth: 720,
-    margin: "auto",
-    paddingBottom: 30,
+    maxWidth: 760,
+    margin: "2.5rem auto 3rem",
+    paddingBottom: 36,
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    color: "#111827",
   },
   logoutButton: {
-    marginBottom: 30,
-    backgroundColor: "#ef4444",
+    marginBottom: 36,
+    backgroundColor: "#dc2626",
     color: "white",
     border: "none",
-    padding: "10px 20px",
-    borderRadius: 14,
+    padding: "12px 28px",
+    borderRadius: 18,
     cursor: "pointer",
     fontWeight: "700",
-    boxShadow: "0 6px 16px rgba(239,68,68,0.6)",
+    fontSize: 16,
+    letterSpacing: "0.8px",
+    boxShadow: "0 10px 28px rgba(220, 38, 38, 0.6)",
+    transition: "background-color 0.3s ease",
+  },
+  logoutButtonHover: {
+    backgroundColor: "#991b1b",
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: 700,
-    marginBottom: 18,
-    color: "#111827",
+    fontSize: 24,
+    fontWeight: 800,
+    marginBottom: 24,
+    color: "#1f2937",
+    letterSpacing: "1px",
   },
   emptyText: {
     color: "#6b7280",
     fontStyle: "italic",
-    marginBottom: 20,
+    marginBottom: 24,
+    fontSize: 15,
   },
   orderCard: {
-    backgroundColor: "white",
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 14,
-    boxShadow: "0 6px 18px rgba(0,0,0,0.05)",
-    border: "1px solid #e5e7eb",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 18,
+    boxShadow: "0 12px 30px rgba(0,0,0,0.08)",
+    border: "1.5px solid #e5e7eb",
     color: "#111827",
+    transition: "box-shadow 0.3s ease",
+  },
+  orderCardHover: {
+    boxShadow: "0 18px 42px rgba(0,0,0,0.14)",
   },
   confirmedOrderCard: {
     backgroundColor: "#d1fae5",
     borderColor: "#10b981",
   },
   actionButtons: {
-    marginTop: 14,
+    marginTop: 20,
     display: "flex",
-    gap: 12,
+    gap: 16,
   },
   confirmBtn: {
-    padding: "8px 16px",
+    padding: "10px 24px",
     backgroundColor: "#10b981",
     color: "white",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 16,
     cursor: "pointer",
-    fontWeight: "600",
-    boxShadow: "0 4px 12px rgba(16,185,129,0.7)",
+    fontWeight: "700",
+    fontSize: 15,
+    boxShadow: "0 6px 18px rgba(16,185,129,0.85)",
+    transition: "background-color 0.3s ease",
+  },
+  confirmBtnHover: {
+    backgroundColor: "#047857",
   },
   deleteBtn: {
-    padding: "8px 16px",
+    padding: "10px 24px",
     backgroundColor: "#ef4444",
     color: "white",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 16,
     cursor: "pointer",
-    fontWeight: "600",
-    boxShadow: "0 4px 12px rgba(239,68,68,0.7)",
+    fontWeight: "700",
+    fontSize: 15,
+    boxShadow: "0 6px 18px rgba(239,68,68,0.85)",
+    transition: "background-color 0.3s ease",
+  },
+  deleteBtnHover: {
+    backgroundColor: "#b91c1c",
   },
 };
+
 
 export default StaffDashboard;

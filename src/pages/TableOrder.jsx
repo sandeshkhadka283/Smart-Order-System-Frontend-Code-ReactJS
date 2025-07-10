@@ -201,89 +201,97 @@ const getStatusBadge = (status) => {
   };
 
   // Confirm pending order (called automatically by timer or manually)
-  const confirmPendingOrder = async () => {
-    if (!pendingOrder || confirming) return; // prevent double call
-    setConfirming(true);
+ const confirmPendingOrder = async () => {
+  if (!pendingOrder || confirming) return; // prevent double call
+  setConfirming(true);
 
-    try {
-      console.log("Confirming pending order:", pendingOrder);
+  try {
+    console.log("Confirming pending order:", pendingOrder);
 
-      // Simulate API call (you can replace with real API call)
-      await api.post("/orders", {
-        tableId: pendingOrder.tableId,
-        items: pendingOrder.items,
-        location: pendingOrder.location,
-      });
+    // Simulate API call (you can replace with real API call)
+    await api.post("/orders", {
+      tableId: pendingOrder.tableId,
+      items: pendingOrder.items,
+      location: pendingOrder.location,
+    });
 
-      setPlacedOrders((prevOrders) => {
-        if (prevOrders.length === 0) {
-          return [
-            {
-              ...pendingOrder,
-              total: pendingOrder.items.reduce(
-                (sum, item) => sum + item.subtotal,
-                0
-              ),
-            },
-          ];
-        }
-
-        const ordersCopy = [...prevOrders];
-        let merged = false;
-
-        for (let i = 0; i < ordersCopy.length; i++) {
-          if (ordersCopy[i].tableId === pendingOrder.tableId) {
-            const mergedItems = mergeOrderItems(
-              ordersCopy[i].items,
-              pendingOrder.items
-            );
-            const total = mergedItems.reduce(
+    setPlacedOrders((prevOrders) => {
+      if (prevOrders.length === 0) {
+        return [
+          {
+            ...pendingOrder,
+            total: pendingOrder.items.reduce(
               (sum, item) => sum + item.subtotal,
               0
-            );
-            ordersCopy[i] = { ...ordersCopy[i], items: mergedItems, total };
-            merged = true;
-            break;
-          }
+            ),
+            status: "Received", // ✅ Add status
+          },
+        ];
+      }
+
+      const ordersCopy = [...prevOrders];
+      let merged = false;
+
+      for (let i = 0; i < ordersCopy.length; i++) {
+        if (ordersCopy[i].tableId === pendingOrder.tableId) {
+          const mergedItems = mergeOrderItems(
+            ordersCopy[i].items,
+            pendingOrder.items
+          );
+          const total = mergedItems.reduce(
+            (sum, item) => sum + item.subtotal,
+            0
+          );
+          ordersCopy[i] = {
+            ...ordersCopy[i],
+            items: mergedItems,
+            total,
+            status: "Received", // ✅ Optional: reset to 'Received' on merge
+          };
+          merged = true;
+          break;
         }
+      }
 
-        if (!merged) {
-          return [
-            ...ordersCopy,
-            {
-              ...pendingOrder,
-              total: pendingOrder.items.reduce(
-                (sum, item) => sum + item.subtotal,
-                0
-              ),
-            },
-          ];
-        }
-        return ordersCopy;
-      });
+      if (!merged) {
+        return [
+          ...ordersCopy,
+          {
+            ...pendingOrder,
+            total: pendingOrder.items.reduce(
+              (sum, item) => sum + item.subtotal,
+              0
+            ),
+            status: "Received", // ✅ Add status
+          },
+        ];
+      }
+      return ordersCopy;
+    });
 
-      Swal.fire({
-        icon: "success",
-        title: "Order Confirmed!",
-        text: "Your order has been placed successfully and can no longer be canceled.",
-        timer: 3000,
-        showConfirmButton: false,
-      });
+    Swal.fire({
+      icon: "success",
+      title: "Order Confirmed!",
+      text: "Your order has been placed successfully and can no longer be canceled.",
+      timer: 3000,
+      showConfirmButton: false,
+    });
 
-      setPendingOrder(null);
-      setCart({});
-      setTimerCount(120);
-    } catch (error) {
-      console.error(error);
-      Swal.fire({
-        icon: "error",
-        title: "Order Failed",
-        text: "Something went wrong while placing your order.",
-      });
-    } finally {
-      setConfirming(false);
-    }
-  };
+    setPendingOrder(null);
+    setCart({});
+    setTimerCount(120);
+  } catch (error) {
+    console.error(error);
+    Swal.fire({
+      icon: "error",
+      title: "Order Failed",
+      text: "Something went wrong while placing your order.",
+    });
+  } finally {
+    setConfirming(false);
+  }
+};
+
 
   // Cancel placed order by order index (user can cancel only before auto confirm)
   const cancelOrder = (index) => {
@@ -503,6 +511,16 @@ const getStatusBadge = (status) => {
                     <div style={styles.orderTable}>Table {order.tableId}</div>
                     <div style={styles.orderTotal}>Rs {order.total}</div>
                   </div>
+                  {/* ✅ Add this below the header */}
+<div
+  style={{
+    ...styles.statusBadge,
+    backgroundColor: getStatusBadge(order.status).bg,
+    color: getStatusBadge(order.status).color,
+  }}
+>
+  {getStatusBadge(order.status).label}
+</div>
                   
                   <ul style={styles.orderItems}>
                     {order.items.map((item, i) => (
@@ -1005,6 +1023,17 @@ const styles = {
     gap: 6,
     transition: "all 0.2s",
   },
+  statusBadge: {
+  padding: "6px 12px",
+  borderRadius: "999px",
+  fontSize: 14,
+  fontWeight: 600,
+  width: "fit-content",
+  margin: "10px 20px 0",
+  display: "inline-block",
+  textTransform: "capitalize",
+},
+
 };
 
 
