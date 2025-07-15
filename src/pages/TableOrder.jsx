@@ -61,33 +61,40 @@ const TableOrder = ({ tableId }) => {
   const [timerCount, setTimerCount] = useState(15);
   const [confirming, setConfirming] = useState(false);
 
+  const [clientIp, setClientIp] = useState("");
+
+
 
     // 🌐 Get user location and setup menu/categories
 
-  useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {
-        Swal.fire({
-          icon: "error",
-          title: "Location Required",
-          text: "Location access is required to place an order!",
-        });
-      }
-    );
+ useEffect(() => {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    () => {
+      Swal.fire({
+        icon: "error",
+        title: "Location Required",
+        text: "Location access is required to place an order!",
+      });
+    }
+  );
 
-    setMenu(menuData);
+  fetch("https://api.ipify.org?format=json")
+    .then((res) => res.json())
+    .then((data) => {
+      setClientIp(data.ip);
+      console.log("Client IP:", data.ip);
+    })
+    .catch((err) => console.error("Failed to fetch IP:", err));
 
+  setMenu(menuData);
 
-        // 📂 Expand all categories by default
-
-    const initExpand = {};
-    Object.keys(menuData).forEach((cat) => {
-      initExpand[cat] = false;
-    });
-    setExpandedCategories(initExpand);
-  }, []);
+  const initExpand = {};
+  Object.keys(menuData).forEach((cat) => {
+    initExpand[cat] = false;
+  });
+  setExpandedCategories(initExpand);
+}, []);
 
 
     // ⏳ Auto-confirm timer logic
@@ -213,6 +220,7 @@ const getStatusBadge = (status) => {
       tableId: pendingOrder.tableId,
       items: pendingOrder.items,
       location: pendingOrder.location,
+      ip:clientIp
     });
 
     setPlacedOrders((prevOrders) => {
@@ -316,40 +324,41 @@ const getStatusBadge = (status) => {
   };
 
   // Called when user clicks Place Order button
-  const handlePlaceOrder = () => {
-    if (!location) {
-      Swal.fire({
-        icon: "error",
-        title: "Location Missing",
-        text: "Please enable location to place an order!",
-      });
-      return;
-    }
-    if (Object.keys(cart).length === 0) {
-      Swal.fire({
-        icon: "warning",
-        title: "Empty Cart",
-        text: "Your cart is empty!",
-      });
-      return;
-    }
-
-    // Prepare pending order data
-    const items = Object.entries(cart).map(([name, { price, qty }]) => ({
-      name,
-      price,
-      quantity: qty,
-      subtotal: price * qty,
-    }));
-
-    setPendingOrder({
-      tableId,
-      items,
-      location,
+ const handlePlaceOrder = () => {
+  if (!location) {
+    Swal.fire({
+      icon: "error",
+      title: "Location Missing",
+      text: "Please enable location to place an order!",
     });
+    return;
+  }
+  if (Object.keys(cart).length === 0) {
+    Swal.fire({
+      icon: "warning",
+      title: "Empty Cart",
+      text: "Your cart is empty!",
+    });
+    return;
+  }
 
-    setTimerCount(120);
-  };
+  // Prepare pending order data
+  const items = Object.entries(cart).map(([name, { price, qty }]) => ({
+    name,
+    price,
+    quantity: qty,
+    subtotal: price * qty,
+  }));
+
+  setPendingOrder({
+    tableId: "40",
+    items,
+    location,
+    ip: clientIp,  // Add IP here
+  });
+
+  setTimerCount(120);
+};
 
   const totalPrice = calculateCartTotal(cart);
 
@@ -357,7 +366,6 @@ const getStatusBadge = (status) => {
     <div style={styles.outerContainer}>
       <div style={styles.container}>
         <h2 style={styles.title}>Table {tableId} - Menu</h2>
-
         {Object.entries(menu).map(([category, items]) => (
           <div key={category} style={styles.categoryContainer}>
             <button
@@ -511,6 +519,7 @@ const getStatusBadge = (status) => {
                     <div style={styles.orderTable}>Table {order.tableId}</div>
                     <div style={styles.orderTotal}>Rs {order.total}</div>
                   </div>
+
                   {/* ✅ Add this below the header */}
 <div
   style={{
