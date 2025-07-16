@@ -3,50 +3,6 @@ import api from "../api";
 import Swal from "sweetalert2";
 
 
-// 🧾 Static Menu Data
-
-const menuData = {
-  Breakfast: [
-    { name: "Pancakes", price: 150 },
-    { name: "Omelette", price: 120 },
-    { name: "French Toast", price: 180 },
-    { name: "Paratha", price: 100 },
-    { name: "Idli Sambar", price: 130 },
-    { name: "Poha", price: 110 },
-  ],
-  Drinks: [
-    { name: "Tea", price: 50 },
-    { name: "Coffee", price: 70 },
-    { name: "Orange Juice", price: 90 },
-    { name: "Lassi", price: 80 },
-    { name: "Cold Drink", price: 60 },
-    { name: "Mineral Water", price: 40 },
-  ],
-  "Veg Main Course": [
-    { name: "Paneer Butter Masala", price: 250 },
-    { name: "Vegetable Biryani", price: 220 },
-    { name: "Dal Tadka", price: 150 },
-    { name: "Chole Bhature", price: 180 },
-    { name: "Mixed Veg Curry", price: 200 },
-    { name: "Aloo Gobi", price: 170 },
-  ],
-  "Non-Veg Main Course": [
-    { name: "Chicken Curry", price: 280 },
-    { name: "Mutton Curry", price: 320 },
-    { name: "Fish Fry", price: 270 },
-    { name: "Egg Curry", price: 150 },
-    { name: "Chicken Biryani", price: 300 },
-    { name: "Butter Chicken", price: 350 },
-  ],
-  Snacks: [
-    { name: "Samosa", price: 50 },
-    { name: "Pakora", price: 60 },
-    { name: "French Fries", price: 100 },
-    { name: "Spring Roll", price: 120 },
-    { name: "Momo (Veg)", price: 200 },
-    { name: "Momo (Chicken)", price: 230 },
-  ],
-};
 
 // 📦 Main Component
 
@@ -69,7 +25,8 @@ const TableOrder = ({ tableId }) => {
 
  useEffect(() => {
   navigator.geolocation.getCurrentPosition(
-    (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    (pos) =>
+      setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
     () => {
       Swal.fire({
         icon: "error",
@@ -79,23 +36,34 @@ const TableOrder = ({ tableId }) => {
     }
   );
 
+  // Fetch IP
   fetch("https://api.ipify.org?format=json")
     .then((res) => res.json())
     .then((data) => {
       setClientIp(data.ip);
-      console.log("Client IP:", data.ip);
-    })
-    .catch((err) => console.error("Failed to fetch IP:", err));
+    });
 
-  setMenu(menuData);
+  // Fetch menu from backend and group it
+ api.get("/menu-items")
+  .then(({ data }) => {
+    const grouped = data.reduce((acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    }, {});
 
-  const initExpand = {};
-  Object.keys(menuData).forEach((cat) => {
-    initExpand[cat] = false;
+    const expandObj = {};
+    Object.keys(grouped).forEach((cat) => (expandObj[cat] = false));
+    setExpandedCategories(expandObj);
+    setMenu(grouped);
+  })
+  .catch((err) => {
+    console.error("Menu fetch error", err);
+    Swal.fire("Error", "Failed to load menu items.", "error");
   });
-  setExpandedCategories(initExpand);
-}, []);
 
+
+}, []);
 
     // ⏳ Auto-confirm timer logic
 

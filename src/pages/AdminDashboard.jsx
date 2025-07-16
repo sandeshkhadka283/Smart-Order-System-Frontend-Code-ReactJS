@@ -14,10 +14,18 @@ const AdminDashboard = () => {
   });
   const [newTableNumber, setNewTableNumber] = useState("");
   const [loading, setLoading] = useState(false);
+  const [menuItems, setMenuItems] = useState([]);
+const [editItem, setEditItem] = useState(null);
+const [editModalOpen, setEditModalOpen] = useState(false);
+
+
 
   const fetchStats = async () => {
     try {
       const { data } = await api.get("/admin/stats");
+          const menuRes = await api.get("/menu-items"); // ✅ Fetch menu items too
+          
+
       setStats({
         totalTables: data.totalTables,
         totalUsers: data.totalUsers,
@@ -26,7 +34,12 @@ const AdminDashboard = () => {
         orders: data.orders || [],
         users: data.users || [],
         tables: data.tables || [],
+              menuItems: menuRes.data || [], // ✅ Include menu items here
+
       });
+
+          setMenuItems(menuRes.data); // ✅ Store menu items in state
+
     } catch (err) {
       console.error(err);
       Swal.fire("Error", "Failed to fetch stats.", "error");
@@ -47,6 +60,8 @@ const AdminDashboard = () => {
       return;
     }
 
+    
+
     setLoading(true);
     try {
       const { data } = await api.post("/tables", { tableNumber: Number(newTableNumber) });
@@ -64,6 +79,13 @@ const AdminDashboard = () => {
       setLoading(false);
     }
   };
+ 
+const handleEditClick = (item) => {
+  setEditItem({ ...item });
+  setEditModalOpen(true);
+};
+
+
 
   const getStatusColor = (status) => {
   switch (status.toLowerCase()) {
@@ -79,24 +101,80 @@ const AdminDashboard = () => {
 };
 
 
+const handleDeleteItem = async (id) => {
+  const confirm = await Swal.fire({
+    title: "Are you sure?",
+    text: "This will permanently delete the menu item.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Yes, delete it!",
+  });
+
+  if (confirm.isConfirmed) {
+    try {
+      await api.delete(`/menu-items/${id}`);
+      Swal.fire("Deleted!", "Menu item has been deleted.", "success");
+      fetchStats(); // refresh the menu list
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "Failed to delete item.", "error");
+    }
+  }
+};
+const handleEditSave = async () => {
+  try {
+    await api.put(`/menu-items/${editItem._id}`, editItem);
+    Swal.fire("Updated!", "Menu item updated successfully.", "success");
+    setEditModalOpen(false);
+    fetchStats();
+  } catch (err) {
+    console.error(err);
+    Swal.fire("Error", "Failed to update item.", "error");
+  }
+};
+
+
+const [menuItem, setMenuItem] = useState({
+  name: "",
+  price: "",
+  category: "",
+});
+const [addingItem, setAddingItem] = useState(false);
+const handleMenuChange = (e) => {
+  const { name, value } = e.target;
+  setMenuItem((prev) => ({ ...prev, [name]: value }));
+};
+const handleAddMenuItem = async () => {
+  if (!menuItem.name || !menuItem.price || !menuItem.category) {
+    return Swal.fire("All fields required", "", "warning");
+  }
+  setAddingItem(true);
+  try {
+    await api.post("/menu-items", {
+      name: menuItem.name,
+      price: Number(menuItem.price),
+      category: menuItem.category,
+    });
+    Swal.fire("Success", "Menu item added!", "success");
+    setMenuItem({ name: "", price: "", category: "" });
+    fetchStats(); // optional: re-fetch stats or update menu UI
+  } catch (err) {
+    console.error(err);
+    Swal.fire("Error", "Failed to add item", "error");
+  } finally {
+    setAddingItem(false);
+  }
+};
+
+
+
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>📊 Admin Dashboard</h1>
 
-      {/* Add Table Section */}
-      <div style={styles.addTableContainer}>
-        <input
-          type="number"
-          placeholder="Enter Table Number"
-          value={newTableNumber}
-          onChange={(e) => setNewTableNumber(e.target.value)}
-          style={styles.input}
-          disabled={loading}
-        />
-        <button onClick={handleAddTable} style={styles.addBtn} disabled={loading}>
-          {loading ? "Adding..." : "Add Table"}
-        </button>
-      </div>
+    
 
       {/* Summary Stats */}
       {/* Summary Stats */}
@@ -126,46 +204,8 @@ const AdminDashboard = () => {
 </div>
 
 
-      {/* Table List */}
-      <h2 style={styles.sectionTitle}>🪑 Tables</h2>
-<div style={styles.tableList}>
-  {stats.tables.length === 0 ? (
-    <p>No tables available.</p>
-  ) : (
-    stats.tables.map((table) => (
-      <div key={table._id} style={styles.tableCard}>
-        <div style={styles.tableInfo}>
-          <h4 style={styles.tableNumber}>Table #{table.tableNumber}</h4>
-          <span style={{ ...styles.statusBadge, ...styles[`status_${table.status}`] }}>
-            {table.status}
-          </span>
-        </div>
-        <p style={styles.tableMeta}>Created: {new Date(table.createdAt).toLocaleString()}</p>
-      </div>
-    ))
-  )}
-</div>
-
-      {/* User List */}
-     <h2 style={styles.sectionTitle}>👥 Users</h2>
-<div style={styles.userList}>
-  {stats.users.length === 0 ? (
-    <p>No users available.</p>
-  ) : (
-    stats.users.map((user) => (
-      <div key={user._id} style={styles.userCard}>
-        <div style={styles.userHeader}>
-          <h4 style={styles.userName}>{user.name || "Unnamed User"}</h4>
-          <span style={styles.userRoleBadge}>{user.role || "customer"}</span>
-        </div>
-        <p style={styles.userEmail}>{user.email}</p>
-        <p style={styles.userMeta}>
-          Registered: {new Date(user.createdAt).toLocaleDateString()}
-        </p>
-      </div>
-    ))
-  )}
-</div>
+   
+    
 
       {/* Order List */}
      <h2 style={styles.sectionTitle}>🧾 Orders</h2>
@@ -199,6 +239,175 @@ const AdminDashboard = () => {
   )}
 </div>
 
+
+
+
+   {/* Table List */}
+      <h2 style={styles.sectionTitle}>🪑 Tables</h2>
+<div style={styles.tableList}>
+  {stats.tables.length === 0 ? (
+    <p>No tables available.</p>
+  ) : (
+    stats.tables.map((table) => (
+      <div key={table._id} style={styles.tableCard}>
+        <div style={styles.tableInfo}>
+          <h4 style={styles.tableNumber}>Table #{table.tableNumber}</h4>
+          <span style={{ ...styles.statusBadge, ...styles[`status_${table.status}`] }}>
+            {table.status}
+          </span>
+        </div>
+        <p style={styles.tableMeta}>Created: {new Date(table.createdAt).toLocaleString()}</p>
+      </div>
+    ))
+  )}
+</div>
+
+
+{/* 🍽️ Menu Items */}
+<h2 style={styles.sectionTitle}>🍽️ Menu Items</h2>
+<div style={styles.menuList}>
+  {stats.menuItems && stats.menuItems.length > 0 ? (
+    stats.menuItems.map((item) => (
+      <div key={item._id} style={styles.menuCard}>
+        <h4 style={styles.menuTitle}>{item.name}</h4>
+        <p style={styles.menuCategory}>Category: {item.category}</p>
+        <p style={styles.menuPrice}>Rs {item.price}</p>
+        <p style={styles.menuDesc}>{item.description}</p>
+        {item.image && (
+          <img
+            src={item.image}
+            alt={item.name}
+            style={{ width: "100%", maxWidth: 150, borderRadius: 8, marginTop: 10 }}
+          />
+        )}
+        <div style={{ marginTop: 10 }}>
+          <button
+            style={{ ...styles.editBtn, marginRight: 10 }}
+            onClick={() => handleEditClick(item)}
+          >
+            Edit
+          </button>
+          <button
+            style={styles.deleteBtn}
+            onClick={() => handleDeleteItem(item._id)}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    ))
+  ) : (
+    <p>No menu items available.</p>
+  )}
+</div>
+
+
+
+
+{/* 🍽️ Add Menu Item Section */}
+<h2 style={styles.sectionTitle}>🍽️ Add Menu Item</h2>
+<div style={styles.addTableContainer}>
+  <input
+    name="name"
+    placeholder="Item Name"
+    value={menuItem.name}
+    onChange={handleMenuChange}
+    style={styles.input}
+  />
+  <input
+    type="number"
+    name="price"
+    placeholder="Price"
+    value={menuItem.price}
+    onChange={handleMenuChange}
+    style={styles.input}
+  />
+  <input
+    name="category"
+    placeholder="Category (e.g., Drinks)"
+    value={menuItem.category}
+    onChange={handleMenuChange}
+    style={styles.input}
+  />
+  <button onClick={handleAddMenuItem} disabled={addingItem} style={styles.addBtn}>
+    {addingItem ? "Adding..." : "Add Item"}
+  </button>
+</div>
+
+
+  {/* Add Table Section */}
+      <div style={styles.addTableContainer}>
+        <input
+          type="number"
+          placeholder="Enter Table Number"
+          value={newTableNumber}
+          onChange={(e) => setNewTableNumber(e.target.value)}
+          style={styles.input}
+          disabled={loading}
+        />
+        <button onClick={handleAddTable} style={styles.addBtn} disabled={loading}>
+          {loading ? "Adding..." : "Add Table"}
+        </button>
+      </div>
+
+{editModalOpen && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalBox}>
+      <h3>Edit Menu Item</h3>
+      <input
+        style={styles.input}
+        value={editItem.name}
+        onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
+        placeholder="Item Name"
+      />
+      <input
+        style={styles.input}
+        type="number"
+        value={editItem.price}
+        onChange={(e) => setEditItem({ ...editItem, price: Number(e.target.value) })}
+        placeholder="Price"
+      />
+      <input
+        style={styles.input}
+        value={editItem.category}
+        onChange={(e) => setEditItem({ ...editItem, category: e.target.value })}
+        placeholder="Category"
+      />
+      <textarea
+        style={{ ...styles.input, height: 60 }}
+        value={editItem.description}
+        onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
+        placeholder="Description"
+      />
+      <div style={{ marginTop: 10 }}>
+        <button style={styles.addBtn} onClick={handleEditSave}>Save</button>
+        <button style={styles.deleteBtn} onClick={() => setEditModalOpen(false)}>Cancel</button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+  {/* User List */}
+     <h2 style={styles.sectionTitle}>👥 Users</h2>
+<div style={styles.userList}>
+  {stats.users.length === 0 ? (
+    <p>No users available.</p>
+  ) : (
+    stats.users.map((user) => (
+      <div key={user._id} style={styles.userCard}>
+        <div style={styles.userHeader}>
+          <h4 style={styles.userName}>{user.name || "Unnamed User"}</h4>
+          <span style={styles.userRoleBadge}>{user.role || "customer"}</span>
+        </div>
+        <p style={styles.userEmail}>{user.email}</p>
+        <p style={styles.userMeta}>
+          Registered: {new Date(user.createdAt).toLocaleDateString()}
+        </p>
+      </div>
+    ))
+  )}
+</div>
     </div>
   );
 };
@@ -484,6 +693,93 @@ orderItem: {
   color: "#334155",
   marginBottom: 6,
 },
+menuList: {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "20px",
+  marginTop: "20px",
+},
+
+menuCard: {
+  background: "#f9fafb",
+  padding: "15px",
+  borderRadius: "10px",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+},
+
+menuTitle: {
+  fontSize: "18px",
+  fontWeight: "600",
+  color: "#1f2937",
+},
+
+menuCategory: {
+  fontSize: "14px",
+  color: "#6b7280",
+},
+
+menuPrice: {
+  fontSize: "16px",
+  fontWeight: "500",
+  color: "#10b981",
+},
+
+menuDesc: {
+  fontSize: "13px",
+  color: "#4b5563",
+},
+menuList: {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "20px",
+},
+
+menuCard: {
+  background: "#fff",
+  border: "1px solid #e2e8f0",
+  borderRadius: "8px",
+  padding: "16px",
+  width: "250px",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+},
+
+editBtn: {
+  padding: "5px 10px",
+  backgroundColor: "#3b82f6",
+  color: "#fff",
+  border: "none",
+  borderRadius: "4px",
+  cursor: "pointer",
+},
+
+deleteBtn: {
+  padding: "5px 10px",
+  backgroundColor: "#ef4444",
+  color: "#fff",
+  border: "none",
+  borderRadius: "4px",
+  cursor: "pointer",
+},
+
+modalOverlay: {
+  position: "fixed",
+  top: 0, left: 0, right: 0, bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 999,
+},
+
+modalBox: {
+  backgroundColor: "#fff",
+  padding: 20,
+  borderRadius: 8,
+  width: "300px",
+  boxShadow: "0 0 10px rgba(0,0,0,0.2)",
+},
+
+
 
 };
 
