@@ -3,6 +3,8 @@ import { Routes, Route } from "react-router-dom";
 import TableOrder from "./pages/TableOrder";
 import StaffDashboard from "./pages/StaffDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Analytics } from "@vercel/analytics/react"
@@ -21,6 +23,8 @@ function App() {
         />
         <Route path="/staff" element={<StaffDashboard />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/superadmin" element={<SuperAdminDashboard />} />
+
       </Routes>
       <ToastContainer position="top-right" autoClose={1500} />
     </div>
