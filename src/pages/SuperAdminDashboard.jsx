@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api"; // ✅ use your axios instance
 
 const SuperAdminDashboard = () => {
   const [businesses, setBusinesses] = useState([]);
@@ -11,19 +11,31 @@ const SuperAdminDashboard = () => {
   }, []);
 
   const fetchBusinesses = async () => {
-    const res = await axios.get("http://localhost:5000/api/superadmin/businesses");
-    setBusinesses(res.data);
+    try {
+      const res = await api.get("/superadmin/businesses"); // ✅ no hardcoded localhost
+      setBusinesses(res.data);
+    } catch (err) {
+      console.error("Failed to fetch businesses:", err);
+    }
   };
 
   const fetchOrders = async (businessId) => {
-    const res = await axios.get(`/api/superadmin/businesses/${businessId}/orders`);
-    setOrders(res.data);
-    setSelectedBusiness(businessId);
+    try {
+      const res = await api.get(`/superadmin/businesses/${businessId}/orders`);
+      setOrders(res.data);
+      setSelectedBusiness(businessId);
+    } catch (err) {
+      console.error("Failed to fetch orders:", err);
+    }
   };
 
   const toggleStatus = async (businessId, action) => {
-    await axios.put(`/api/superadmin/businesses/${businessId}/${action}`);
-    fetchBusinesses();
+    try {
+      await api.put(`/superadmin/businesses/${businessId}/${action}`);
+      fetchBusinesses();
+    } catch (err) {
+      console.error("Failed to toggle status:", err);
+    }
   };
 
   return (
@@ -63,7 +75,8 @@ const SuperAdminDashboard = () => {
           <ul>
             {orders.map((order) => (
               <li key={order._id}>
-                Table {order.table} - {order.status} - Items: {order.items.map(i => i.name).join(", ")}
+                Table {order.table} - {order.status} - Items:{" "}
+                {order.items.map((i) => i.name).join(", ")}
               </li>
             ))}
           </ul>
