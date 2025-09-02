@@ -1,8 +1,18 @@
 import axios from "axios";
 
 // Create an Axios instance
+
+
+// Automatically choose URL based on environment
+const BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? process.env.REACT_APP_API_URL
+    : "http://localhost:5000/api";
+
+
+// Create Axios instance
 const api = axios.create({
-  baseURL: "https://smartorderbackend-production.up.railway.app/api/", // ✅ Change this to your live server URL when deploying
+  baseURL: BASE_URL,
 });
 
 // Automatically attach token to every request
