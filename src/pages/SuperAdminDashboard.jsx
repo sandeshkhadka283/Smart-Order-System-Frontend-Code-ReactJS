@@ -3,6 +3,8 @@ import api from "../api"; // axios instance
 import toast, { Toaster } from "react-hot-toast";
 
 const SuperAdminDashboard = () => {
+  console.log("Using API URL:", process.env.REACT_APP_API_URL);
+
   const [businesses, setBusinesses] = useState([]);
   const [form, setForm] = useState({ name: "", ownerEmail: "", dbName: "" });
   const [editing, setEditing] = useState(null);

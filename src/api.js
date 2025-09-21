@@ -1,27 +1,36 @@
 import axios from "axios";
 
-// Create an Axios instance
+// URLs
+const PROD_URL = process.env.REACT_APP_API_URL;
+const LOCAL_URL = "http://localhost:5000/api";
 
+// Use LOCAL_URL if PROD_URL is missing (especially useful during development)
+const baseURL = PROD_URL || LOCAL_URL;
 
-// Automatically choose URL based on environment
-const BASE_URL =
-  process.env.NODE_ENV === "production"
-    ? process.env.REACT_APP_API_URL
-    : "http://localhost:5000/api";
+const api = axios.create({ baseURL });
 
+// Optional: Fallback if production server is unreachable
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (
+      error.code === "ERR_NETWORK" &&
+      error.config.baseURL === PROD_URL &&
+      PROD_URL // only fallback if PROD_URL was actually defined
+    ) {
+      console.warn(
+        "Production server unreachable. Falling back to local backend..."
+      );
+      return axios({ ...error.config, baseURL: LOCAL_URL });
+    }
+    return Promise.reject(error);
+  }
+);
 
-// Create Axios instance
-const api = axios.create({
-  baseURL: BASE_URL,
-});
-
-// Automatically attach token to every request
+// Token handling
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
 
   console.log(
     `➡️ [${new Date().toISOString()}] ${config.method.toUpperCase()} ${config.url}`,
@@ -31,7 +40,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response & Error logging
+// Logging responses and errors
 api.interceptors.response.use(
   (response) => {
     console.log(
@@ -46,11 +55,10 @@ api.interceptors.response.use(
       error.message
     );
 
-    // Optional: Handle unauthorized access globally
     if (error.response?.status === 401) {
       console.warn("🔒 Token invalid or expired. Logging out...");
       localStorage.removeItem("token");
-      window.location.href = "/"; // redirect to login or home
+      window.location.href = "/";
     }
 
     return Promise.reject(error);
