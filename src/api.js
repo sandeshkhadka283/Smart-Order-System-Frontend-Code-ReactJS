@@ -5,7 +5,7 @@ const PROD_URL = process.env.REACT_APP_API_URL;
 const LOCAL_URL = "http://localhost:5000/api";
 
 // Use LOCAL_URL if PROD_URL is missing (especially useful during development)
-const baseURL = PROD_URL || LOCAL_URL;
+const baseURL = LOCAL_URL;
 
 const api = axios.create({ baseURL });
 
